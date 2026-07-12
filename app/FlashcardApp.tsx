@@ -5,7 +5,6 @@ import {
   ArrowRight,
   Check,
   Languages,
-  Play,
   RotateCcw,
   Search,
   Shuffle,
@@ -14,6 +13,7 @@ import {
   Volume2,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { PointerEvent } from "react";
 
 type Phrase = {
   id: number;
@@ -45,6 +45,7 @@ const BACK_MODES: Array<{ id: BackMode; label: string }> = [
 ];
 
 const VOICES = ["marin", "cedar", "coral", "nova"] as const;
+const SWIPE_DISTANCE = 52;
 
 function unique(values: string[]) {
   return Array.from(new Set(values.filter(Boolean))).sort((a, b) =>
@@ -77,6 +78,11 @@ function pickBrowserVoice() {
   );
 }
 
+function englishIsVisible(nextFlipped: boolean, backMode: BackMode) {
+  if (nextFlipped) return backMode === "english" || backMode === "all";
+  return backMode === "japanese";
+}
+
 export function FlashcardApp() {
   const [phrases, setPhrases] = useState<Phrase[]>([]);
   const [chapter, setChapter] = useState<(typeof CHAPTERS)[number]["id"]>("1-1000");
@@ -93,6 +99,8 @@ export function FlashcardApp() {
   const [showStarredOnly, setShowStarredOnly] = useState(false);
   const [status, setStatus] = useState("");
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const swipeStartRef = useRef<{ pointerId: number; x: number; y: number } | null>(null);
+  const ignoreNextCardClickRef = useRef(false);
 
   const resetPosition = useCallback(() => {
     setIndex(0);
@@ -148,20 +156,10 @@ export function FlashcardApp() {
     });
   }, [category, chapterPhrases, query, scene, showStarredOnly, starred]);
 
-  const active = filtered[index] ?? filtered[0] ?? null;
+  const currentIndex = filtered.length ? Math.min(index, filtered.length - 1) : 0;
+  const active = filtered[currentIndex] ?? null;
   const knownCount = filtered.filter((phrase) => known.has(phrase.id)).length;
   const progress = filtered.length ? Math.round((knownCount / filtered.length) * 100) : 0;
-
-  useEffect(() => {
-    setIndex(0);
-    setFlipped(false);
-  }, [chapter, category, scene, query, showStarredOnly]);
-
-  useEffect(() => {
-    if (scene !== "all" && !sceneOptions.includes(scene)) {
-      setScene("all");
-    }
-  }, [scene, sceneOptions]);
 
   const move = useCallback(
     (direction: -1 | 1) => {
@@ -178,10 +176,10 @@ export function FlashcardApp() {
   const shuffle = useCallback(() => {
     if (!filtered.length) return;
     const next = Math.floor(Math.random() * filtered.length);
-    setIndex(next === index && filtered.length > 1 ? (next + 1) % filtered.length : next);
+    setIndex(next === currentIndex && filtered.length > 1 ? (next + 1) % filtered.length : next);
     setFlipped(false);
     setStatus("");
-  }, [filtered.length, index]);
+  }, [currentIndex, filtered.length]);
 
   const toggleKnown = useCallback(() => {
     if (!active) return;
@@ -266,6 +264,57 @@ export function FlashcardApp() {
     }
   }, [active, playBrowserSpeech, voice, voiceMode]);
 
+  const flipCard = useCallback(() => {
+    if (!active) return;
+    const nextFlipped = !flipped;
+    setFlipped(nextFlipped);
+
+    if (englishIsVisible(nextFlipped, backMode)) {
+      void playSpeech();
+    }
+  }, [active, backMode, flipped, playSpeech]);
+
+  const handleCardPointerDown = useCallback(
+    (event: PointerEvent<HTMLButtonElement>) => {
+      if (!active || event.pointerType === "mouse") return;
+      swipeStartRef.current = {
+        pointerId: event.pointerId,
+        x: event.clientX,
+        y: event.clientY,
+      };
+    },
+    [active],
+  );
+
+  const handleCardPointerUp = useCallback(
+    (event: PointerEvent<HTMLButtonElement>) => {
+      const start = swipeStartRef.current;
+      swipeStartRef.current = null;
+      if (!active || !start || start.pointerId !== event.pointerId) return;
+
+      const deltaX = event.clientX - start.x;
+      const deltaY = event.clientY - start.y;
+      const absX = Math.abs(deltaX);
+      const absY = Math.abs(deltaY);
+
+      if (absX >= SWIPE_DISTANCE && absX > absY * 1.25) {
+        ignoreNextCardClickRef.current = true;
+        event.preventDefault();
+        move(deltaX < 0 ? 1 : -1);
+      }
+    },
+    [active, move],
+  );
+
+  const handleCardClick = useCallback(() => {
+    if (ignoreNextCardClickRef.current) {
+      ignoreNextCardClickRef.current = false;
+      return;
+    }
+
+    flipCard();
+  }, [flipCard]);
+
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
@@ -274,7 +323,7 @@ export function FlashcardApp() {
       if (event.key === "ArrowRight") move(1);
       if (event.key === " ") {
         event.preventDefault();
-        setFlipped((value) => !value);
+        flipCard();
       }
       if (event.key.toLowerCase() === "p") {
         void playSpeech();
@@ -283,7 +332,7 @@ export function FlashcardApp() {
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [move, playSpeech]);
+  }, [flipCard, move, playSpeech]);
 
   const frontLabel = backMode === "japanese" ? "A面 英語" : "A面 日本語";
   const frontText = active ? (backMode === "japanese" ? active.english : active.japanese) : "";
@@ -522,10 +571,15 @@ export function FlashcardApp() {
           </div>
 
           <button
-            aria-label="カードを反転"
+            aria-label="カードを反転。左右スワイプで前後へ移動"
             className={flipped ? "flashcard flipped" : "flashcard"}
             disabled={!active}
-            onClick={() => setFlipped((value) => !value)}
+            onClick={handleCardClick}
+            onPointerCancel={() => {
+              swipeStartRef.current = null;
+            }}
+            onPointerDown={handleCardPointerDown}
+            onPointerUp={handleCardPointerUp}
             type="button"
           >
             <span className="card-face card-front" aria-hidden={flipped}>
@@ -549,7 +603,7 @@ export function FlashcardApp() {
               <ArrowLeft size={19} />
               前へ
             </button>
-            <button disabled={!active} onClick={() => setFlipped((value) => !value)} type="button">
+            <button disabled={!active} onClick={flipCard} type="button">
               <RotateCcw size={19} />
               反転
             </button>
@@ -570,7 +624,7 @@ export function FlashcardApp() {
 
           <div className="phrase-strip" aria-live="polite">
             <span>
-              {filtered.length ? `${index + 1} / ${filtered.length}` : "0 / 0"}
+              {filtered.length ? `${currentIndex + 1} / ${filtered.length}` : "0 / 0"}
             </span>
             <span>{status}</span>
             <span>
@@ -586,7 +640,7 @@ export function FlashcardApp() {
             <strong>{filtered.length.toLocaleString()}</strong>
           </div>
           <div className="phrase-list">
-            {filtered.slice(Math.max(0, index - 18), index + 19).map((phrase) => (
+            {filtered.slice(Math.max(0, currentIndex - 18), currentIndex + 19).map((phrase) => (
               <button
                 className={phrase.id === active?.id ? "row active" : "row"}
                 key={phrase.id}
