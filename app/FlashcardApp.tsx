@@ -160,6 +160,11 @@ export function FlashcardApp() {
   const active = filtered[currentIndex] ?? null;
   const knownCount = filtered.filter((phrase) => known.has(phrase.id)).length;
   const progress = filtered.length ? Math.round((knownCount / filtered.length) * 100) : 0;
+  const emptyMessage = phrases.length
+    ? showStarredOnly
+      ? "お気に入りはまだありません"
+      : "該当する文がありません"
+    : "読み込み中";
 
   const move = useCallback(
     (direction: -1 | 1) => {
@@ -525,7 +530,7 @@ export function FlashcardApp() {
             type="button"
           >
             <Star size={17} />
-            お気に入り
+            お気に入りだけ表示
           </button>
         </aside>
 
@@ -538,11 +543,11 @@ export function FlashcardApp() {
             </div>
             <div className="toolbar-actions">
               <button
-                aria-label="お気に入り"
+                aria-label={active && starred.has(active.id) ? "お気に入りから外す" : "この文をお気に入りに追加"}
                 className={active && starred.has(active.id) ? "icon-button active" : "icon-button"}
                 disabled={!active}
                 onClick={toggleStarred}
-                title="お気に入り"
+                title={active && starred.has(active.id) ? "お気に入りから外す" : "この文をお気に入りに追加"}
                 type="button"
               >
                 <Star size={19} />
@@ -585,7 +590,7 @@ export function FlashcardApp() {
             <span className="card-face card-front" aria-hidden={flipped}>
               <span className="card-label">{frontLabel}</span>
               <span className={backMode === "japanese" ? "prompt english-text" : "prompt japanese-text"}>
-                {frontText || "読み込み中"}
+                {frontText || emptyMessage}
               </span>
               <span className="scene-line">
                 {active ? `${active.category} / ${active.scene}` : ""}

@@ -67,7 +67,12 @@ function readSet(key) {
 }
 
 function saveSet(key, values) {
-  localStorage.setItem(key, JSON.stringify(Array.from(values)));
+  try {
+    localStorage.setItem(key, JSON.stringify(Array.from(values)));
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function unique(values) {
@@ -222,6 +227,11 @@ function render() {
   const active = activePhrase(filtered);
   const knownCount = filtered.filter((phrase) => state.known.has(phrase.id)).length;
   const progress = filtered.length ? Math.round((knownCount / filtered.length) * 100) : 0;
+  const emptyMessage = state.phrases.length
+    ? state.showStarredOnly
+      ? "お気に入りはまだありません"
+      : "該当する文がありません"
+    : "読み込み中";
 
   elements.chapterTabs.forEach((tab) => {
     const selected = tab.dataset.chapter === state.chapter;
@@ -242,6 +252,9 @@ function render() {
 
   elements.starredFilter.classList.toggle("active", state.showStarredOnly);
   elements.starredFilter.setAttribute("aria-pressed", String(state.showStarredOnly));
+  elements.starredFilter.textContent = state.showStarredOnly
+    ? "★ お気に入りだけ表示"
+    : "☆ お気に入りだけ表示";
 
   setText(elements.phraseNo, `No. ${active?.id ?? "-"}`);
   setText(elements.phraseLevel, active?.level ?? "-");
@@ -249,7 +262,7 @@ function render() {
 
   const frontIsEnglish = state.backMode === "japanese";
   setText(elements.frontLabel, frontIsEnglish ? "A面 英語" : "A面 日本語");
-  setText(elements.frontText, active ? (frontIsEnglish ? active.english : active.japanese) : "読み込み中");
+  setText(elements.frontText, active ? (frontIsEnglish ? active.english : active.japanese) : emptyMessage);
   elements.frontText.className = frontIsEnglish ? "prompt english-text" : "prompt japanese-text";
   setText(elements.sceneLine, active ? `${active.category} / ${active.scene}` : "");
 
@@ -266,6 +279,11 @@ function render() {
   const isKnown = Boolean(active && state.known.has(active.id));
   elements.starButton.classList.toggle("active", isStarred);
   elements.starButton.textContent = isStarred ? "★" : "☆";
+  elements.starButton.setAttribute(
+    "aria-label",
+    isStarred ? "お気に入りから外す" : "この文をお気に入りに追加",
+  );
+  elements.starButton.title = isStarred ? "お気に入りから外す" : "この文をお気に入りに追加";
   elements.knownButton.classList.toggle("active", isKnown);
 
   [
@@ -364,7 +382,9 @@ function toggleKnown() {
   } else {
     state.known.add(active.id);
   }
-  saveSet("english-2000-known", state.known);
+  if (!saveSet("english-2000-known", state.known)) {
+    state.status = "保存できませんでした";
+  }
   render();
 }
 
@@ -377,7 +397,7 @@ function toggleStarred() {
   } else {
     state.starred.add(active.id);
   }
-  saveSet("english-2000-starred", state.starred);
+  state.status = saveSet("english-2000-starred", state.starred) ? "" : "保存できませんでした";
   render();
 }
 
