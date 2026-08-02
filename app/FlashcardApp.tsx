@@ -44,7 +44,21 @@ const BACK_MODES: Array<{ id: BackMode; label: string }> = [
   { id: "all", label: "全部" },
 ];
 
-const VOICES = ["marin", "cedar", "coral", "nova"] as const;
+const VOICES = [
+  "marin",
+  "cedar",
+  "coral",
+  "nova",
+  "alloy",
+  "ash",
+  "ballad",
+  "echo",
+  "fable",
+  "onyx",
+  "sage",
+  "shimmer",
+  "verse",
+] as const;
 const SWIPE_DISTANCE = 52;
 const LAST_PHRASE_KEY = "english-2000-last-phrase";
 
@@ -313,7 +327,7 @@ export function FlashcardApp() {
       return;
     }
 
-    setStatus("GPT音声を準備中");
+    setStatus("GPT自然音声を準備中");
 
     try {
       const response = await fetch("/api/speech", {
@@ -330,7 +344,7 @@ export function FlashcardApp() {
       audioRef.current = audio;
       audio.onended = () => URL.revokeObjectURL(url);
       await audio.play();
-      setStatus("GPT音声");
+      setStatus("GPT自然音声");
     } catch {
       playBrowserSpeech(text);
       setStatus("GPT音声未設定 / ブラウザ音声");

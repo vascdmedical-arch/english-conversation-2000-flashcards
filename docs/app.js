@@ -7,6 +7,8 @@ const BACK_MODES = [
 
 const SWIPE_DISTANCE = 52;
 const LAST_PHRASE_KEY = "english-2000-last-phrase";
+const GPT_SPEECH_ENDPOINT = "https://english-conversation-2000.keisuke7777.chatgpt.site/api/speech";
+let activeAudio = null;
 
 const state = {
   phrases: [],
@@ -378,7 +380,7 @@ function pickBrowserVoice() {
   );
 }
 
-function playSpeech() {
+function playBrowserSpeech() {
   const active = activePhrase(filteredPhrases());
   if (!active || !("speechSynthesis" in window)) {
     state.status = "音声を再生できません";
@@ -403,6 +405,44 @@ function playSpeech() {
   speechSynthesis.speak(utterance);
   state.status = "音声";
   render();
+}
+
+async function playSpeech() {
+  const active = activePhrase(filteredPhrases());
+  if (!active) return;
+
+  if (activeAudio) {
+    activeAudio.pause();
+    activeAudio = null;
+  }
+
+  state.status = "GPT自然音声を準備中";
+  render();
+
+  try {
+    const response = await fetch(GPT_SPEECH_ENDPOINT, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: active.english, voice: "marin" }),
+    });
+
+    if (!response.ok) throw new Error(String(response.status));
+
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const audio = new Audio(url);
+    activeAudio = audio;
+    audio.onended = () => {
+      URL.revokeObjectURL(url);
+      state.status = "";
+      render();
+    };
+    await audio.play();
+    state.status = "GPT自然音声";
+    render();
+  } catch {
+    playBrowserSpeech();
+  }
 }
 
 function flipCard() {

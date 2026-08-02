@@ -14,4 +14,4 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ## Speech
 
-GPT speech uses `OPENAI_API_KEY` on the server with `gpt-4o-mini-tts`. If the key is not configured, the app falls back to browser speech synthesis.
+GPT speech uses `OPENAI_API_KEY` on the server with OpenAI's current text-to-speech model, `gpt-4o-mini-tts`. The app defaults to the recommended `marin` voice and uses natural conversation instructions. If the key is not configured, the app falls back to browser speech synthesis.
