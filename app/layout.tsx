@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "英会話 2000 フラッシュカード",
-  description: "日常英会話2000文を章別・B面別に練習できるカードアプリです。",
+  title: "英会話フラッシュカード",
+  description: "重複を整理した日常英会話を章別・B面別に練習できるカードアプリです。",
   icons: {
     icon: "/favicon.svg",
     shortcut: "/favicon.svg",

@@ -152,7 +152,7 @@ export function FlashcardApp() {
       .then((response) => response.json())
       .then((data: Phrase[]) => {
         const lastPhraseId = readNumber(LAST_PHRASE_KEY);
-        const lastPhrase = data.find((phrase) => phrase.id === lastPhraseId);
+        const lastPhrase = lastPhraseId ? data[findNearestIndexById(data, lastPhraseId)] : null;
 
         setPhrases(data);
 
@@ -160,7 +160,7 @@ export function FlashcardApp() {
           const lastChapterPhrases = data.filter((phrase) => phrase.chapter === lastPhrase.chapter);
           setChapter(lastPhrase.chapter);
           setIndex(findNearestIndexById(lastChapterPhrases, lastPhrase.id));
-          setStatus("前回の続きから再開");
+          setStatus(lastPhrase.id === lastPhraseId ? "前回の続きから再開" : "前回の近くから再開");
         }
       })
       .catch(() => setStatus("データを読み込めませんでした"));
@@ -444,7 +444,7 @@ export function FlashcardApp() {
           </div>
           <div>
             <p className="eyebrow">Daily English</p>
-            <h1>英会話 2000</h1>
+            <h1>英会話カード</h1>
           </div>
         </div>
 

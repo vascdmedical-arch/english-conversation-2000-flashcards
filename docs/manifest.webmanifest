@@ -1,7 +1,7 @@
 {
-  "name": "英会話 2000",
-  "short_name": "英会話2000",
-  "description": "日常英会話2000文を章別・B面別に練習できるフラッシュカードです。",
+  "name": "英会話フラッシュカード",
+  "short_name": "英会話カード",
+  "description": "重複を整理した日常英会話を章別・B面別に練習できるフラッシュカードです。",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

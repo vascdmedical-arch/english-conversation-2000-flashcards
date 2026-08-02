@@ -587,11 +587,13 @@ async function boot() {
     state.phrases = await response.json();
 
     const lastPhraseId = readNumber(LAST_PHRASE_KEY);
-    const lastPhrase = state.phrases.find((phrase) => phrase.id === lastPhraseId);
+    const lastPhrase = lastPhraseId
+      ? state.phrases[findNearestIndexById(state.phrases, lastPhraseId)]
+      : null;
     if (lastPhrase) {
       state.chapter = lastPhrase.chapter;
       state.index = findNearestIndexById(chapterPhrases(), lastPhrase.id);
-      state.status = "前回の続きから再開";
+      state.status = lastPhrase.id === lastPhraseId ? "前回の続きから再開" : "前回の近くから再開";
     }
 
     render();
