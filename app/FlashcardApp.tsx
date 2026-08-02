@@ -148,7 +148,7 @@ export function FlashcardApp() {
   }, []);
 
   useEffect(() => {
-    fetch("/phrases.json")
+    fetch("/phrases-v5.json")
       .then((response) => response.json())
       .then((data: Phrase[]) => {
         const lastPhraseId = readNumber(LAST_PHRASE_KEY);
