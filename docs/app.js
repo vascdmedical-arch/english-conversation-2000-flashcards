@@ -6,6 +6,7 @@ const BACK_MODES = [
 ];
 
 const SWIPE_DISTANCE = 52;
+const LAST_PHRASE_KEY = "english-2000-last-phrase";
 
 const state = {
   phrases: [],
@@ -55,6 +56,11 @@ const elements = {
   chapterTitle: document.querySelector("#chapter-title"),
   listCount: document.querySelector("#list-count"),
   phraseList: document.querySelector("#phrase-list"),
+  jumpCurrent: document.querySelector("#jump-current"),
+  phraseSlider: document.querySelector("#phrase-slider"),
+  jumpMin: document.querySelector("#jump-min"),
+  jumpMax: document.querySelector("#jump-max"),
+  jumpNumber: document.querySelector("#jump-number"),
 };
 
 function readSet(key) {
@@ -73,6 +79,41 @@ function saveSet(key, values) {
   } catch {
     return false;
   }
+}
+
+function readNumber(key) {
+  try {
+    const value = Number(localStorage.getItem(key));
+    return Number.isFinite(value) && value > 0 ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveNumber(key, value) {
+  try {
+    localStorage.setItem(key, String(value));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function findNearestIndexById(phrases, phraseId) {
+  if (!phrases.length) return 0;
+
+  let bestIndex = 0;
+  let bestDistance = Math.abs(phrases[0].id - phraseId);
+
+  phrases.forEach((phrase, index) => {
+    const distance = Math.abs(phrase.id - phraseId);
+    if (distance < bestDistance) {
+      bestIndex = index;
+      bestDistance = distance;
+    }
+  });
+
+  return bestIndex;
 }
 
 function unique(values) {
@@ -227,6 +268,9 @@ function render() {
   const active = activePhrase(filtered);
   const knownCount = filtered.filter((phrase) => state.known.has(phrase.id)).length;
   const progress = filtered.length ? Math.round((knownCount / filtered.length) * 100) : 0;
+  const sliderMin = filtered[0]?.id ?? 1;
+  const sliderMax = filtered[filtered.length - 1]?.id ?? sliderMin;
+  const sliderValue = active?.id ?? sliderMin;
   const emptyMessage = state.phrases.length
     ? state.showStarredOnly
       ? "お気に入りはまだありません"
@@ -301,6 +345,21 @@ function render() {
   setText(elements.position, filtered.length ? `${state.index + 1} / ${filtered.length}` : "0 / 0");
   setText(elements.status, state.status);
   setText(elements.chapterTitle, active?.chapterTitle ?? "");
+
+  setText(elements.jumpCurrent, `No. ${active?.id ?? "-"}`);
+  setText(elements.jumpMin, `No. ${sliderMin}`);
+  setText(elements.jumpMax, `No. ${sliderMax}`);
+  elements.phraseSlider.min = String(sliderMin);
+  elements.phraseSlider.max = String(sliderMax);
+  elements.phraseSlider.value = String(sliderValue);
+  elements.phraseSlider.disabled = !active;
+  elements.jumpNumber.min = String(sliderMin);
+  elements.jumpNumber.max = String(sliderMax);
+  elements.jumpNumber.value = active?.id ?? "";
+  elements.jumpNumber.disabled = !active;
+
+  if (active) saveNumber(LAST_PHRASE_KEY, active.id);
+
   renderList(filtered, active);
 }
 
@@ -358,6 +417,15 @@ function move(direction) {
   const filtered = filteredPhrases();
   if (!filtered.length) return;
   state.index = (state.index + direction + filtered.length) % filtered.length;
+  state.flipped = false;
+  state.status = "";
+  render();
+}
+
+function jumpToPhraseId(phraseId) {
+  const filtered = filteredPhrases();
+  if (!filtered.length || !Number.isFinite(phraseId)) return;
+  state.index = findNearestIndexById(filtered, phraseId);
   state.flipped = false;
   state.status = "";
   render();
@@ -453,6 +521,12 @@ function wireEvents() {
   elements.nextButton.addEventListener("click", () => move(1));
   elements.flipButton.addEventListener("click", flipCard);
   elements.knownButton.addEventListener("click", toggleKnown);
+  elements.phraseSlider.addEventListener("input", (event) => {
+    jumpToPhraseId(Number(event.target.value));
+  });
+  elements.jumpNumber.addEventListener("input", (event) => {
+    if (event.target.value) jumpToPhraseId(Number(event.target.value));
+  });
 
   elements.flashcard.addEventListener("pointerdown", (event) => {
     if (event.pointerType === "mouse") return;
@@ -511,6 +585,15 @@ async function boot() {
     const response = await fetch("./phrases.json");
     if (!response.ok) throw new Error(String(response.status));
     state.phrases = await response.json();
+
+    const lastPhraseId = readNumber(LAST_PHRASE_KEY);
+    const lastPhrase = state.phrases.find((phrase) => phrase.id === lastPhraseId);
+    if (lastPhrase) {
+      state.chapter = lastPhrase.chapter;
+      state.index = findNearestIndexById(chapterPhrases(), lastPhrase.id);
+      state.status = "前回の続きから再開";
+    }
+
     render();
   } catch {
     state.status = "データを読み込めませんでした";

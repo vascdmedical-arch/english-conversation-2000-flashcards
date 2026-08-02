@@ -46,6 +46,7 @@ const BACK_MODES: Array<{ id: BackMode; label: string }> = [
 
 const VOICES = ["marin", "cedar", "coral", "nova"] as const;
 const SWIPE_DISTANCE = 52;
+const LAST_PHRASE_KEY = "english-2000-last-phrase";
 
 function unique(values: string[]) {
   return Array.from(new Set(values.filter(Boolean))).sort((a, b) =>
@@ -66,6 +67,44 @@ function readSet(key: string) {
 
 function saveSet(key: string, values: Set<number>) {
   window.localStorage.setItem(key, JSON.stringify(Array.from(values)));
+}
+
+function readNumber(key: string) {
+  if (typeof window === "undefined") return null;
+
+  try {
+    const value = Number(window.localStorage.getItem(key));
+    return Number.isFinite(value) && value > 0 ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveNumber(key: string, value: number) {
+  if (typeof window === "undefined") return;
+
+  try {
+    window.localStorage.setItem(key, String(value));
+  } catch {
+    // Progress is helpful, but the card should still work if storage is blocked.
+  }
+}
+
+function findNearestIndexById(phrases: Phrase[], phraseId: number) {
+  if (!phrases.length) return 0;
+
+  let bestIndex = 0;
+  let bestDistance = Math.abs(phrases[0].id - phraseId);
+
+  phrases.forEach((phrase, index) => {
+    const distance = Math.abs(phrase.id - phraseId);
+    if (distance < bestDistance) {
+      bestIndex = index;
+      bestDistance = distance;
+    }
+  });
+
+  return bestIndex;
 }
 
 function pickBrowserVoice() {
@@ -111,7 +150,19 @@ export function FlashcardApp() {
   useEffect(() => {
     fetch("/phrases.json")
       .then((response) => response.json())
-      .then((data: Phrase[]) => setPhrases(data))
+      .then((data: Phrase[]) => {
+        const lastPhraseId = readNumber(LAST_PHRASE_KEY);
+        const lastPhrase = data.find((phrase) => phrase.id === lastPhraseId);
+
+        setPhrases(data);
+
+        if (lastPhrase) {
+          const lastChapterPhrases = data.filter((phrase) => phrase.chapter === lastPhrase.chapter);
+          setChapter(lastPhrase.chapter);
+          setIndex(findNearestIndexById(lastChapterPhrases, lastPhrase.id));
+          setStatus("前回の続きから再開");
+        }
+      })
       .catch(() => setStatus("データを読み込めませんでした"));
   }, []);
 
@@ -165,6 +216,13 @@ export function FlashcardApp() {
       ? "お気に入りはまだありません"
       : "該当する文がありません"
     : "読み込み中";
+  const sliderMin = filtered[0]?.id ?? 1;
+  const sliderMax = filtered[filtered.length - 1]?.id ?? sliderMin;
+  const sliderValue = active?.id ?? sliderMin;
+
+  useEffect(() => {
+    if (active) saveNumber(LAST_PHRASE_KEY, active.id);
+  }, [active]);
 
   const move = useCallback(
     (direction: -1 | 1) => {
@@ -185,6 +243,16 @@ export function FlashcardApp() {
     setFlipped(false);
     setStatus("");
   }, [currentIndex, filtered.length]);
+
+  const jumpToPhraseId = useCallback(
+    (phraseId: number) => {
+      if (!filtered.length || !Number.isFinite(phraseId)) return;
+      setIndex(findNearestIndexById(filtered, phraseId));
+      setFlipped(false);
+      setStatus("");
+    },
+    [filtered],
+  );
 
   const toggleKnown = useCallback(() => {
     if (!active) return;
@@ -602,6 +670,43 @@ export function FlashcardApp() {
               {backContent}
             </span>
           </button>
+
+          <div className="jump-panel" aria-label="番号で移動">
+            <div className="jump-header">
+              <span>番号</span>
+              <strong>No. {active?.id ?? "-"}</strong>
+            </div>
+            <input
+              aria-label="文番号スライダー"
+              className="phrase-slider"
+              disabled={!active}
+              max={sliderMax}
+              min={sliderMin}
+              onChange={(event) => jumpToPhraseId(Number(event.target.value))}
+              step={1}
+              type="range"
+              value={sliderValue}
+            />
+            <div className="jump-footer">
+              <span>No. {sliderMin}</span>
+              <label className="jump-number">
+                <span>No.</span>
+                <input
+                  aria-label="文番号"
+                  disabled={!active}
+                  inputMode="numeric"
+                  max={sliderMax}
+                  min={sliderMin}
+                  onChange={(event) => {
+                    if (event.target.value) jumpToPhraseId(Number(event.target.value));
+                  }}
+                  type="number"
+                  value={active?.id ?? ""}
+                />
+              </label>
+              <span>No. {sliderMax}</span>
+            </div>
+          </div>
 
           <div className="nav-row">
             <button disabled={!active} onClick={() => move(-1)} type="button">

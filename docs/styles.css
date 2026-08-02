@@ -432,6 +432,63 @@ select {
   max-width: 880px;
 }
 
+.jump-panel {
+  background: #f8faf6;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+  padding: 12px;
+}
+
+.jump-header,
+.jump-footer {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+}
+
+.jump-header span,
+.jump-footer span,
+.jump-number span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.jump-header strong {
+  color: var(--teal-dark);
+  font-size: 18px;
+}
+
+.phrase-slider {
+  accent-color: var(--teal);
+  height: 28px;
+  width: 100%;
+}
+
+.jump-number {
+  align-items: center;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: flex;
+  gap: 7px;
+  min-height: 38px;
+  padding: 0 10px;
+}
+
+.jump-number input {
+  background: transparent;
+  border: 0;
+  color: var(--ink);
+  font-weight: 800;
+  outline: 0;
+  text-align: center;
+  width: 72px;
+}
+
 .nav-row {
   display: grid;
   gap: 10px;
@@ -617,6 +674,19 @@ select {
 
   .answer-text {
     font-size: 28px;
+  }
+
+  .jump-footer {
+    gap: 8px;
+  }
+
+  .jump-footer > span {
+    min-width: 54px;
+  }
+
+  .jump-number {
+    flex: 1;
+    justify-content: center;
   }
 
   .nav-row {
