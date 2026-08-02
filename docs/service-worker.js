@@ -1,10 +1,10 @@
-const CACHE_NAME = "english-conversation-2000-v6";
+const CACHE_NAME = "english-conversation-2000-v7";
 const ASSETS = [
   "./",
   "./index.html",
   "./styles.css",
   "./app.js",
-  "./phrases-v5.json",
+  "./phrases-v6.json",
   "./favicon.svg",
   "./apple-touch-icon.png",
   "./icon-192.png",

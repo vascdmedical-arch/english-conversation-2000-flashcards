@@ -582,7 +582,7 @@ async function boot() {
   wireEvents();
 
   try {
-    const response = await fetch("./phrases-v5.json");
+    const response = await fetch("./phrases-v6.json");
     if (!response.ok) throw new Error(String(response.status));
     state.phrases = await response.json();
 
