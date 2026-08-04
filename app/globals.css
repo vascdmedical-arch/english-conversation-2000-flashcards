@@ -212,12 +212,14 @@ select {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
-.segmented.compact {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.voice-select {
-  width: 100%;
+.voice-note {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--muted);
+  font-size: 13px;
+  min-height: 42px;
+  padding: 11px 12px;
 }
 
 .progress-panel {

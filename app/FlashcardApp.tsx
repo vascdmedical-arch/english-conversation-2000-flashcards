@@ -30,7 +30,6 @@ type Phrase = {
 };
 
 type BackMode = "english" | "japanese" | "memo" | "all";
-type VoiceMode = "gpt" | "browser";
 
 const CHAPTERS = [
   { id: "1-1000", label: "1-1000", title: "基本1000" },
@@ -44,21 +43,6 @@ const BACK_MODES: Array<{ id: BackMode; label: string }> = [
   { id: "all", label: "全部" },
 ];
 
-const VOICES = [
-  "marin",
-  "cedar",
-  "coral",
-  "nova",
-  "alloy",
-  "ash",
-  "ballad",
-  "echo",
-  "fable",
-  "onyx",
-  "sage",
-  "shimmer",
-  "verse",
-] as const;
 const SWIPE_DISTANCE = 52;
 const LAST_PHRASE_KEY = "english-2000-last-phrase";
 
@@ -104,6 +88,11 @@ function saveNumber(key: string, value: number) {
   }
 }
 
+function cancelDeviceSpeech() {
+  if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+  window.speechSynthesis.cancel();
+}
+
 function findNearestIndexById(phrases: Phrase[], phraseId: number) {
   if (!phrases.length) return 0;
 
@@ -140,8 +129,6 @@ export function FlashcardApp() {
   const [phrases, setPhrases] = useState<Phrase[]>([]);
   const [chapter, setChapter] = useState<(typeof CHAPTERS)[number]["id"]>("1-1000");
   const [backMode, setBackMode] = useState<BackMode>("english");
-  const [voiceMode, setVoiceMode] = useState<VoiceMode>("gpt");
-  const [voice, setVoice] = useState<(typeof VOICES)[number]>("marin");
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("all");
   const [scene, setScene] = useState("all");
@@ -151,11 +138,11 @@ export function FlashcardApp() {
   const [starred, setStarred] = useState<Set<number>>(() => readSet("english-2000-starred"));
   const [showStarredOnly, setShowStarredOnly] = useState(false);
   const [status, setStatus] = useState("");
-  const audioRef = useRef<HTMLAudioElement | null>(null);
   const swipeStartRef = useRef<{ pointerId: number; x: number; y: number } | null>(null);
   const ignoreNextCardClickRef = useRef(false);
 
   const resetPosition = useCallback(() => {
+    cancelDeviceSpeech();
     setIndex(0);
     setFlipped(false);
     setStatus("");
@@ -240,6 +227,7 @@ export function FlashcardApp() {
 
   const move = useCallback(
     (direction: -1 | 1) => {
+      cancelDeviceSpeech();
       setIndex((current) => {
         if (!filtered.length) return 0;
         return (current + direction + filtered.length) % filtered.length;
@@ -252,6 +240,7 @@ export function FlashcardApp() {
 
   const shuffle = useCallback(() => {
     if (!filtered.length) return;
+    cancelDeviceSpeech();
     const next = Math.floor(Math.random() * filtered.length);
     setIndex(next === currentIndex && filtered.length > 1 ? (next + 1) % filtered.length : next);
     setFlipped(false);
@@ -261,6 +250,7 @@ export function FlashcardApp() {
   const jumpToPhraseId = useCallback(
     (phraseId: number) => {
       if (!filtered.length || !Number.isFinite(phraseId)) return;
+      cancelDeviceSpeech();
       setIndex(findNearestIndexById(filtered, phraseId));
       setFlipped(false);
       setStatus("");
@@ -296,7 +286,7 @@ export function FlashcardApp() {
     });
   }, [active]);
 
-  const playBrowserSpeech = useCallback((text: string) => {
+  const playDeviceSpeech = useCallback((text: string) => {
     if (!("speechSynthesis" in window)) {
       setStatus("音声を再生できません");
       return;
@@ -305,51 +295,20 @@ export function FlashcardApp() {
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = "en-US";
-    utterance.rate = 0.92;
+    utterance.rate = 1;
     utterance.pitch = 1;
     const selectedVoice = pickBrowserVoice();
     if (selectedVoice) utterance.voice = selectedVoice;
+    utterance.onend = () => setStatus("");
+    utterance.onerror = () => setStatus("音声を再生できません");
     window.speechSynthesis.speak(utterance);
-    setStatus("ブラウザ音声");
+    setStatus("スマホ音声");
   }, []);
 
-  const playSpeech = useCallback(async () => {
+  const playSpeech = useCallback(() => {
     if (!active) return;
-    const text = active.english;
-
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current = null;
-    }
-
-    if (voiceMode === "browser") {
-      playBrowserSpeech(text);
-      return;
-    }
-
-    setStatus("GPT自然音声を準備中");
-
-    try {
-      const response = await fetch("/api/speech", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, voice }),
-      });
-
-      if (!response.ok) throw new Error(String(response.status));
-
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      const audio = new Audio(url);
-      audioRef.current = audio;
-      audio.onended = () => URL.revokeObjectURL(url);
-      await audio.play();
-      setStatus("GPT自然音声");
-    } catch {
-      playBrowserSpeech(text);
-      setStatus("GPT音声未設定 / ブラウザ音声");
-    }
-  }, [active, playBrowserSpeech, voice, voiceMode]);
+    playDeviceSpeech(active.english);
+  }, [active, playDeviceSpeech]);
 
   const flipCard = useCallback(() => {
     if (!active) return;
@@ -357,7 +316,7 @@ export function FlashcardApp() {
     setFlipped(nextFlipped);
 
     if (englishIsVisible(nextFlipped, backMode)) {
-      void playSpeech();
+      playSpeech();
     }
   }, [active, backMode, flipped, playSpeech]);
 
@@ -413,7 +372,7 @@ export function FlashcardApp() {
         flipCard();
       }
       if (event.key.toLowerCase() === "p") {
-        void playSpeech();
+        playSpeech();
       }
     };
 
@@ -562,34 +521,7 @@ export function FlashcardApp() {
 
           <div className="mode-block">
             <span className="section-label">音声</span>
-            <div className="segmented compact" role="group" aria-label="音声">
-              <button
-                className={voiceMode === "gpt" ? "active" : ""}
-                onClick={() => setVoiceMode("gpt")}
-                type="button"
-              >
-                GPT
-              </button>
-              <button
-                className={voiceMode === "browser" ? "active" : ""}
-                onClick={() => setVoiceMode("browser")}
-                type="button"
-              >
-                Browser
-              </button>
-            </div>
-            <select
-              aria-label="GPT音声"
-              className="voice-select"
-              onChange={(event) => setVoice(event.target.value as (typeof VOICES)[number])}
-              value={voice}
-            >
-              {VOICES.map((item) => (
-                <option key={item} value={item}>
-                  {item}
-                </option>
-              ))}
-            </select>
+            <div className="voice-note">スマホ音声</div>
           </div>
 
           <div className="progress-panel">
@@ -648,7 +580,7 @@ export function FlashcardApp() {
                 aria-label="発音"
                 className="icon-button primary"
                 disabled={!active}
-                onClick={() => void playSpeech()}
+                onClick={playSpeech}
                 title="発音"
                 type="button"
               >

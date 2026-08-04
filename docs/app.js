@@ -7,8 +7,6 @@ const BACK_MODES = [
 
 const SWIPE_DISTANCE = 52;
 const LAST_PHRASE_KEY = "english-2000-last-phrase";
-const GPT_SPEECH_ENDPOINT = "https://english-conversation-2000.keisuke7777.chatgpt.site/api/speech";
-let activeAudio = null;
 
 const state = {
   phrases: [],
@@ -101,6 +99,10 @@ function saveNumber(key, value) {
   }
 }
 
+function cancelDeviceSpeech() {
+  if ("speechSynthesis" in window) speechSynthesis.cancel();
+}
+
 function findNearestIndexById(phrases, phraseId) {
   if (!phrases.length) return 0;
 
@@ -158,6 +160,7 @@ function filteredPhrases() {
 }
 
 function resetPosition() {
+  cancelDeviceSpeech();
   state.index = 0;
   state.flipped = false;
   state.status = "";
@@ -391,7 +394,7 @@ function playBrowserSpeech() {
   speechSynthesis.cancel();
   const utterance = new SpeechSynthesisUtterance(active.english);
   utterance.lang = "en-US";
-  utterance.rate = 0.92;
+  utterance.rate = 1;
   utterance.pitch = 1;
 
   const voice = pickBrowserVoice();
@@ -403,46 +406,12 @@ function playBrowserSpeech() {
   };
 
   speechSynthesis.speak(utterance);
-  state.status = "音声";
+  state.status = "スマホ音声";
   render();
 }
 
-async function playSpeech() {
-  const active = activePhrase(filteredPhrases());
-  if (!active) return;
-
-  if (activeAudio) {
-    activeAudio.pause();
-    activeAudio = null;
-  }
-
-  state.status = "GPT自然音声を準備中";
-  render();
-
-  try {
-    const response = await fetch(GPT_SPEECH_ENDPOINT, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text: active.english, voice: "marin" }),
-    });
-
-    if (!response.ok) throw new Error(String(response.status));
-
-    const blob = await response.blob();
-    const url = URL.createObjectURL(blob);
-    const audio = new Audio(url);
-    activeAudio = audio;
-    audio.onended = () => {
-      URL.revokeObjectURL(url);
-      state.status = "";
-      render();
-    };
-    await audio.play();
-    state.status = "GPT自然音声";
-    render();
-  } catch {
-    playBrowserSpeech();
-  }
+function playSpeech() {
+  playBrowserSpeech();
 }
 
 function flipCard() {
@@ -456,6 +425,7 @@ function flipCard() {
 function move(direction) {
   const filtered = filteredPhrases();
   if (!filtered.length) return;
+  cancelDeviceSpeech();
   state.index = (state.index + direction + filtered.length) % filtered.length;
   state.flipped = false;
   state.status = "";
@@ -465,6 +435,7 @@ function move(direction) {
 function jumpToPhraseId(phraseId) {
   const filtered = filteredPhrases();
   if (!filtered.length || !Number.isFinite(phraseId)) return;
+  cancelDeviceSpeech();
   state.index = findNearestIndexById(filtered, phraseId);
   state.flipped = false;
   state.status = "";
@@ -474,6 +445,7 @@ function jumpToPhraseId(phraseId) {
 function shuffle() {
   const filtered = filteredPhrases();
   if (!filtered.length) return;
+  cancelDeviceSpeech();
   const next = Math.floor(Math.random() * filtered.length);
   state.index = next === state.index && filtered.length > 1 ? (next + 1) % filtered.length : next;
   state.flipped = false;
